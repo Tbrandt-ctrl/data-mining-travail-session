@@ -1,0 +1,78 @@
+---
+title: "Gradient boosting and OVO"
+author: "Jean-Nicolas B. Di Zazzo"
+date: "2023-02-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cars}
+summary(iris)
+```
+install.packages("MLmetrics")
+
+```{r pressure, echo=FALSE}
+
+# Load the necessary packages
+library(xgboost)
+library(caret)
+library(MLmetrics)
+
+# Load the Iris dataset
+data(iris)
+
+# Split the data into training and testing sets
+trainIndex <- createDataPartition(iris$Species, p = .8, list = FALSE)
+train <- iris[trainIndex, ]
+test <- iris[-trainIndex, ]
+
+# Convert the target variable into a factor
+train$Species <- as.factor(train$Species)
+test$Species <- as.factor(test$Species)
+
+# Define the tuning grid for the model
+tuneGrid <- expand.grid(
+  nrounds = c(50, 100, 150),
+  max_depth = c(3, 6, 9),
+  eta = c(0.1, 0.3, 0.5),
+  gamma = 0,
+  colsample_bytree = c(0.6, 0.8),
+  subsample = c(0.5, 1),
+  min_child_weight = 1
+)
+
+# Define the OvO strategy using the multiclass.ova function from the caret package
+control <- trainControl(method = "repeatedcv", number = 10, repeats = 3, 
+                        classProbs = TRUE, summaryFunction = multiClassSummary)
+
+# Set the seed for reproducibility
+set.seed(123)
+
+# Train the gradient boosting model using the train function from the caret package
+gbm <- train(
+  Species ~ ., 
+  data = train, 
+  method = "xgbTree", 
+  trControl = control, 
+  verbose = FALSE, 
+  tuneGrid = tuneGrid,
+  nthread = 1 # avoid the 'ntree_limit' warning message
+)
+
+# Make predictions on the test set using the predict function
+pred <- predict(gbm, newdata = test)
+
+# Evaluate the performance of the model using the confusionMatrix function from the caret package
+cm <- confusionMatrix(pred, test$Species)
+
+# Print the confusion matrix and accuracy
+print(cm)
+print(paste("Accuracy:", cm$overall["Accuracy"]))
+
+
+
+```
