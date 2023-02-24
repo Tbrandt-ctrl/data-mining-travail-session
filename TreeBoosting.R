@@ -1,5 +1,7 @@
 # https://www.datatechnotes.com/2022/05/lightgbm-multi-class-classification.html
 
+library(irr)
+library(yardstick)
 library(summarytools)
 library(caret)
 library(lightgbm)
@@ -169,17 +171,17 @@ params_random_opti <- list(objective = "multiclass",
                     metric = 'multi_logloss', 
                     num_class = 4
                     
-                    ,learning_rate = 0.1300448
-                    ,num_leaves = 35
-                    ,min_data = 40
-                    ,max_depth = 704
-                    ,early_stopping_round = 26
+                    ,learning_rate = 0.127909
+                    ,num_leaves = 17
+                    ,min_data = 97
+                    ,max_depth = 3749
+                    ,early_stopping_round = 30
                     )
 
 modelyrandom_opti <- lgb.train(
                       params_random_opti,
                       dtrain, 
-                      nrounds = 262L,
+                      nrounds = 300L,
                       valids,
                       categorical_feature = namescat
 )
@@ -266,6 +268,7 @@ comparison_table <- data.frame(
 names(comparison_table) = c("Accuracy", "MAUC", "Kappa")
 row.names(comparison_table) = c("400L", "300L", "141L", "Random Opti")
 
+print(comparison_table)
 
 
 # IL FAUT OPTIMISER LE NOMBRE D'ARBRES ET LA TAILLE DES ARBRES
@@ -295,25 +298,8 @@ write.csv(pred_model_gtb_4_df,file= "pred_model_gtb_4.csv", row.names = FALSE)
 
 ### OPTIMISATION ### 
 
-## Optimiser le nombre d'itérations ##
 
-library(irr)
-library(yardstick)
-# LE TESTER AVEC LE F-1 SCORE
 
-# klgb=c(0,0)
-# for( i in seq(30,400,5))
-#{
-#  pred_comp = predict(modely400, lgbtrainvalid_x, reshape=T, num_iteration=i) 
-#  pred_comp_y = max.col(pred_comp)-1 
-  
-#  data <- cbind(pred_comp_y, lgbtrainvalid_y)
-#  kappa <- kappa2(data)$value
-  
-#  klgb=rbind(klgb,c(i, kappa))
-# }
 
-# klgb=klgb[-1,]
-# plot(klgb[,1],klgb[,2],xlab="Nombre d'itérations",ylab="Kappa",type="b")
-# Nombre d'itérations avec le Kappa le plus grand
-# klgb[which.max(klgb[,2]),]
+
+
