@@ -1,5 +1,5 @@
 
-set.seed(100)
+set.seed(123)
 
 library(lightgbm)
 library(caret)
@@ -59,10 +59,10 @@ lgbtrain$y <- as.numeric(lgbtrain$y) -1 #pour lgbm
 
 ### ITERATIONS
 
-iterations <- 1000
+iterations <- 10000
 
 best_accuracy <- 0.78
-best_hyperparams <- list()
+best_hyperparams <- listM()
 
 for (i in 1:iterations){
   print(paste0("iteration count ",i))
@@ -118,9 +118,9 @@ for (i in 1:iterations){
     
     # Random Hyperparameters
     
-    hyperparams$num_iter <- 300L
+    hyperparams$num_iter <- sample(200:300, size=1)
     hyperparams$learning_rate <- runif(1, min=0, max=1)
-    hyperparams$num_leaves <- 17 # opti pour 17 sample(20:300, size=1)
+    hyperparams$num_leaves <- sample(20:300, size=1)
     hyperparams$min_data <- sample(10:100, size=1)
     hyperparams$max_depth <- sample(10:5000, size=1)
     hyperparams$early_stopping_round <- 30 # 10% of number iter
