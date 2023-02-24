@@ -132,40 +132,24 @@ modely141 <- lgb.train(params,
 
 
 
-params_opti <- list(objective = "multiclass", 
+params_random_opti <- list(objective = "multiclass", 
                     metric = 'multi_logloss', 
                     num_class = 4
-                    # ,learning_rate = .1
+                    ,learning_rate = 0.127909
+                    ,num_leaves = 17
+                    ,min_data = 97
+                    ,max_depth = 3749
+                    ,early_stopping_round = 30
                     )
 
-modely141_opti <- lgb.train(
-                      params_opti,
+modely141_random_opti <- lgb.train(
+                      params_random_opti,
                       dtrain, 
-                      nrounds = 141L,
+                      nrounds = 300,
                       valids,
                       categorical_feature = namescat
 )
 
-hyper_params <- list( 
-                      learning_rate = c(0.01, 0.05, 0.1),
-                      num_leaves = c(10, 20, 30),
-                      max_depth = c(5, 10, 15),
-                      min_child_samples = c(10, 20, 30),
-                      feature_fraction = c(0.5, 0.7, 1),
-                      bagging_fraction = c(0.5, 0.7, 1)
-)
-tune_grid <- expand.grid(
-  learning_rate = hyper_params$learning_rate,
-  num_leaves = hyper_params$num_leaves,
-  max_depth = hyper_params$max_depth,
-  min_child_samples = hyper_params$min_child_samples,
-  feature_fraction = hyper_params$feature_fraction,
-  bagging_fraction = hyper_params$bagging_fraction
-)
-
-control <- trainControl(method = "cv", number = 5, verboseIter = TRUE)
-
-# lgb.cv()
 
 # https://neptune.ai/blog/lightgbm-parameters-guide
 
@@ -210,22 +194,22 @@ pred_y_141L = as.numeric(pred_y_141L) + 1 # Pour les remettre dans le bon format
 conf_141L <- confusionMatrix(as.factor(lgbtrainvalid_y), as.factor(pred_comp_y_141L))
 accuracy_141L <- conf_141L$overall[["Accuracy"]]
 
-# 141L_opti
+# 141L_random_opti
 
-pred_comp_141L_opti = predict(modely141_opti, lgbtrainvalid_x, reshape=T) # Prediction pour 1000 données
-pred_comp_y_141L_opti = max.col(pred_comp_141L_opti)-1 
+pred_comp_141L_random_opti = predict(modely141_random_opti, lgbtrainvalid_x, reshape=T) # Prediction pour 1000 données
+pred_comp_y_141L_random_opti = max.col(pred_comp_141L_random_opti)-1 
 
-pred_141L_opti = predict(modely141_opti, lgbtest_x, reshape=T) # Prédiction pour 55000 données
-pred_y_141L_opti = max.col(pred_141L_opti)-1
-pred_y_141L_opti = as.numeric(pred_y_141L_opti) + 1 # Pour les remettre dans le bon format pour Kaggle
+pred_141L_random_opti = predict(modely141_random_opti, lgbtest_x, reshape=T) # Prédiction pour 55000 données
+pred_y_141L_random_opti = max.col(pred_141L_random_opti)-1
+pred_y_141L_random_opti = as.numeric(pred_y_141L_random_opti) + 1 # Pour les remettre dans le bon format pour Kaggle
 
-conf_141L_opti <- confusionMatrix(as.factor(lgbtrainvalid_y), as.factor(pred_comp_y_141L_opti))
-accuracy_141L_opti <- conf_141L_opti$overall[["Accuracy"]]
+conf_141L_random_opti <- confusionMatrix(as.factor(lgbtrainvalid_y), as.factor(pred_comp_y_141L_random_opti))
+accuracy_141L_random_opti <- conf_141L_random_opti$overall[["Accuracy"]]
 
 accuracy_400L
 accuracy_300L
 accuracy_141L
-accuracy_141L_opti
+accuracy_141L_random_opti
 
 
 # tree_imp = lgb.importance(modely400, percentage = T)
@@ -244,6 +228,9 @@ write.csv(pred_model_gtb_2_df,file= "pred_model_gtb_2.csv", row.names = FALSE)
 
 pred_model_gtb_3_df = data.frame(id=test$id, y=pred_y_141L)
 write.csv(pred_model_gtb_3_df,file= "pred_model_gtb_3.csv", row.names = FALSE)
+
+pred_model_gtb_4_df = data.frame(id=test$id, y=pred_y_141L_random_opti)
+write.csv(pred_model_gtb_4_df,file= "pred_model_gtb_4.csv", row.names = FALSE)
 
 
 # le paramètre de rétrécissement 𝜖 n’est
