@@ -1,8 +1,13 @@
+
+
 # https://www.datatechnotes.com/2022/05/lightgbm-multi-class-classification.html
 
+library(irr)
+library(yardstick)
 library(summarytools)
 library(caret)
 library(lightgbm)
+library(pROC)
 
 ### FONCTIONS D'AIDE ### 
 
@@ -19,7 +24,39 @@ stdf=function(dat1,dat2, dat3)
   list(as.data.frame(scale(dat1, center=mu , scale=std)),
        as.data.frame(scale(dat2, center=mu , scale=std)),
        as.data.frame(scale(dat3, center=mu , scale=std))
-       )
+  )
+}
+
+
+# MAUC
+
+getMAUC <- function(predictions, actual_y){ # Use 1:0 versions with 0:3 classes
+  aucs <- c()
+  for (i in 0:3) {
+    converted_predictions <- c(ifelse(predictions == i, 1, 0))
+    converted_actuals <- c(ifelse(actual_y == i, 1, 0))
+    
+    roc_object <- roc(converted_actuals, converted_predictions)
+    
+    auc <- auc(roc_object)
+    
+    aucs <- rbind(auc, aucs)
+  }
+  
+  # Calculate the MAUC
+  mauc <- mean(aucs)
+  
+  return(mauc)
+}
+
+# KAPPA
+
+getKappa <- function(predictions, actual_y){
+  
+  data <- cbind(predictions, actual_y)
+  kappa <- kappa2(data)$value
+  
+  return(kappa)
 }
 
 
@@ -73,7 +110,7 @@ outstd = stdf(
   lgbtraintrain_x[, !(names(lgbtraintrain_x) %in% namescat)], 
   lgbtrainvalid_x[, !(names(lgbtrainvalid_x) %in% namescat)],
   lgbtest_x[, !(names(lgbtest_x) %in% namescat)]
-  )
+)
 lgbtraintrain_x = cbind(lgbtraintrain_x[, (names(lgbtraintrain_x) %in% namescat)], outstd[[1]])
 lgbtrainvalid_x = cbind(lgbtrainvalid_x[, (names(lgbtrainvalid_x) %in% namescat)], outstd[[2]])
 lgbtest_x = cbind(lgbtest_x[, (names(lgbtest_x) %in% namescat)], outstd[[3]])
@@ -103,8 +140,8 @@ dvalid = lgb.Dataset.create.valid(dtrain, data=lgbtrainvalid_x, label=lgbtrainva
 # Entrainement des modèles
 
 params <-  list(objective = "multiclass", 
-              metric = 'multi_logloss', 
-              num_class = 4)
+                metric = 'multi_logloss', 
+                num_class = 4)
 
 valids = list(test = dvalid)
 
@@ -113,7 +150,7 @@ modely400 <- lgb.train(params,
                        nrounds = 400L,
                        valids,
                        categorical_feature = namescat,
-                    )
+)
 
 modely300 <- lgb.train(params,
                        dtrain, 
@@ -127,45 +164,30 @@ modely141 <- lgb.train(params,
                        nrounds = 141L,
                        valids,
                        categorical_feature = namescat,
-                     )
-
-
-
-
-params_opti <- list(objective = "multiclass", 
-                    metric = 'multi_logloss', 
-                    num_class = 4
-                    # ,learning_rate = .1
-                    )
-
-modely141_opti <- lgb.train(
-                      params_opti,
-                      dtrain, 
-                      nrounds = 141L,
-                      valids,
-                      categorical_feature = namescat
 )
 
-hyper_params <- list( 
-                      learning_rate = c(0.01, 0.05, 0.1),
-                      num_leaves = c(10, 20, 30),
-                      max_depth = c(5, 10, 15),
-                      min_child_samples = c(10, 20, 30),
-                      feature_fraction = c(0.5, 0.7, 1),
-                      bagging_fraction = c(0.5, 0.7, 1)
-)
-tune_grid <- expand.grid(
-  learning_rate = hyper_params$learning_rate,
-  num_leaves = hyper_params$num_leaves,
-  max_depth = hyper_params$max_depth,
-  min_child_samples = hyper_params$min_child_samples,
-  feature_fraction = hyper_params$feature_fraction,
-  bagging_fraction = hyper_params$bagging_fraction
+
+
+
+params_random_opti <- list(objective = "multiclass", 
+                           metric = 'multi_logloss', 
+                           num_class = 4
+                           
+                           ,learning_rate = 0.127909
+                           ,num_leaves = 17
+                           ,min_data = 97
+                           ,max_depth = 3749
+                           ,early_stopping_round = 30
 )
 
-control <- trainControl(method = "cv", number = 5, verboseIter = TRUE)
+modelyrandom_opti <- lgb.train(
+  params_random_opti,
+  dtrain, 
+  nrounds = 300L,
+  valids,
+  categorical_feature = namescat
+)
 
-# lgb.cv()
 
 # https://neptune.ai/blog/lightgbm-parameters-guide
 
@@ -210,29 +232,49 @@ pred_y_141L = as.numeric(pred_y_141L) + 1 # Pour les remettre dans le bon format
 conf_141L <- confusionMatrix(as.factor(lgbtrainvalid_y), as.factor(pred_comp_y_141L))
 accuracy_141L <- conf_141L$overall[["Accuracy"]]
 
-# 141L_opti
+# random_opti
 
-pred_comp_141L_opti = predict(modely141_opti, lgbtrainvalid_x, reshape=T) # Prediction pour 1000 données
-pred_comp_y_141L_opti = max.col(pred_comp_141L_opti)-1 
+pred_comp_random_opti = predict(modelyrandom_opti, lgbtrainvalid_x, reshape=T) # Prediction pour 1000 données
+pred_comp_y_random_opti = max.col(pred_comp_random_opti)-1 
 
-pred_141L_opti = predict(modely141_opti, lgbtest_x, reshape=T) # Prédiction pour 55000 données
-pred_y_141L_opti = max.col(pred_141L_opti)-1
-pred_y_141L_opti = as.numeric(pred_y_141L_opti) + 1 # Pour les remettre dans le bon format pour Kaggle
+pred_random_opti = predict(modelyrandom_opti, lgbtest_x, reshape=T) # Prédiction pour 55000 données
+pred_y_random_opti = max.col(pred_random_opti)-1
+pred_y_random_opti = as.numeric(pred_y_random_opti) + 1 # Pour les remettre dans le bon format pour Kaggle
 
-conf_141L_opti <- confusionMatrix(as.factor(lgbtrainvalid_y), as.factor(pred_comp_y_141L_opti))
-accuracy_141L_opti <- conf_141L_opti$overall[["Accuracy"]]
-
-accuracy_400L
-accuracy_300L
-accuracy_141L
-accuracy_141L_opti
+conf_random_opti <- confusionMatrix(as.factor(lgbtrainvalid_y), as.factor(pred_comp_y_random_opti))
+accuracy_random_opti <- conf_random_opti$overall[["Accuracy"]]
 
 
-# tree_imp = lgb.importance(modely400, percentage = T)
-# lgb.plot.importance(tree_imp, measure = "Gain")
+
+### COMPARAISON ### 
+
+## TABLE
+
+comparison_table <- data.frame(
+  rbind(
+    c(accuracy_400L, 
+      getKappa(pred_comp_y_400L, lgbtrainvalid_y),
+      getMAUC(pred_comp_y_400L,lgbtrainvalid_y )),
+    c(accuracy_300L,
+      getKappa(pred_comp_y_300L, lgbtrainvalid_y),
+      getMAUC(pred_comp_y_300L,lgbtrainvalid_y )),
+    c(accuracy_141L,
+      getKappa(pred_comp_y_141L, lgbtrainvalid_y),
+      getMAUC(pred_comp_y_141L,lgbtrainvalid_y )),
+    c(accuracy_random_opti,
+      getKappa(pred_comp_y_random_opti, lgbtrainvalid_y),
+      getMAUC(pred_comp_y_random_opti,lgbtrainvalid_y ))
+  )
+)
+
+names(comparison_table) = c("Accuracy", "MAUC", "Kappa")
+row.names(comparison_table) = c("400L", "300L", "141L", "Random Opti")
+
+print(comparison_table)
+
 
 # IL FAUT OPTIMISER LE NOMBRE D'ARBRES ET LA TAILLE DES ARBRES
-# IL FAUT STANDARDISER LES DONNÉES
+
 
 
 ### FICHIERS ###
@@ -245,6 +287,9 @@ write.csv(pred_model_gtb_2_df,file= "pred_model_gtb_2.csv", row.names = FALSE)
 pred_model_gtb_3_df = data.frame(id=test$id, y=pred_y_141L)
 write.csv(pred_model_gtb_3_df,file= "pred_model_gtb_3.csv", row.names = FALSE)
 
+pred_model_gtb_4_df = data.frame(id=test$id, y=pred_y_random_opti)
+write.csv(pred_model_gtb_4_df,file= "pred_model_gtb_4.csv", row.names = FALSE)
+
 
 # le paramètre de rétrécissement 𝜖 n’est
 # pas vraiment un paramètres à optimiser. Il suffit de le choisir assez
@@ -254,33 +299,6 @@ write.csv(pred_model_gtb_3_df,file= "pred_model_gtb_3.csv", row.names = FALSE)
 # STACKING DE MODELES
 
 ### OPTIMISATION ### 
-
-## Optimiser le nombre d'itérations ##
-
-library(irr)
-library(yardstick)
-# LE TESTER AVEC LE F-1 SCORE
-
-klgb=c(0,0)
-for( i in seq(30,400,5))
-{
-  pred_comp = predict(modely400, lgbtrainvalid_x, reshape=T, num_iteration=i) 
-  pred_comp_y = max.col(pred_comp)-1 
-  
-  data <- cbind(pred_comp_y, lgbtrainvalid_y)
-  kappa <- kappa2(data)$value
-  
-  klgb=rbind(klgb,c(i, kappa))
-}
-
-klgb=klgb[-1,]
-plot(klgb[,1],klgb[,2],xlab="Nombre d'itérations",ylab="Kappa",type="b")
-# Nombre d'itérations avec le Kappa le plus grand
-klgb[which.max(klgb[,2]),]
-
-
-
-
 
 
 
